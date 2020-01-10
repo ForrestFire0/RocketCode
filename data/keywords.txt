@@ -1,0 +1,4 @@
+Smoother   KEYWORD1
+newReading    KEYWORD2
+getValue     KEYWORD2
+getNet     KEYWORD2

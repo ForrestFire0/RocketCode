@@ -17,21 +17,20 @@
   get the alt 20x a second. Calculate the speed based on the altimeter 10x a second.
 
 */
-//#include <MemoryFree.h>
+
 #include <LPS.h> //Pressure
 #include <LSM303.h> //Accelerometer
 #include <L3G.h> //gyro
 #include <Wire.h> //talking to the stuff
-byte fetch_pressure(unsigned int *p_Pressure); //convert value to byte data type FOR PITOT (unknown use).
 #include <SoftwareSerial.h> //Talking to open logger
 #include <MadgwickAHRS.h> //quaternions
 
 //Things to screw with:
 #define servoPin 9 //doesnt do anything rn
+#define address 0x28
 #define tickSpeedMS 20 //time between loops in miliseconds. (PROB DONT EDIT) (BUT YOU COULD  - no now you cant.) (we tested this. You can edit this. Currently, the tick takes 20 ms, so theoretically it could run 50 times a second. 
 #define tickSpeedS (tickSpeedMS / 1000.0f) // this tickspeed in terms of seconds.
 //UPDATE: the accelerometer run 50x a second (20ms). The alitude runs 20x a second (50ms). The speed calculatoin for the altitude runs 10x a second.
-
 
 #define targetAlt 800 //Target altitude of the launch.
 #define sensitivity 1 //Multiplier for servo control.
@@ -40,8 +39,9 @@ byte fetch_pressure(unsigned int *p_Pressure); //convert value to byte data type
 #define speed_alpha 0.2427f //determinded by spread sh
 #define VtSq 7103.91f
 
-#define debugMode true //debug mode allows for all of the flight software to be running (aka, accelerometers no longer dictate orientation, also gryos stop being calibrated). You can tast flight stuff while still on the ground. Also, this sets communications to the serial monitor and not the logger.
+#define debugMode false//debug mode allows for all of the flight software to be running (aka, accelerometers no longer dictate orientation, also gryos stop being calibrated). You can tast flight stuff while still on the ground. Also, this sets communications to the serial monitor and not the logger.
 //#define debugRestTime 20000 //usuall set to 15000, the amount of time that the chip rests before deciding to be flying. This ends calibration.
+//^^^ DEPRECIATED: Now just waits for a serial line to become available.
 
 Madgwick filter; //creates a quaternion.
 LPS ps; // PRESSURE SENSOR
@@ -103,6 +103,11 @@ void setup() {
   }
   gyro.enableDefault();
   delay(3000);
+
+
+  Logger.println(F("Succesful Boot"));
+
+  Logger.println(F("Place On Lanuch Pad....."));
 }
 
 void calculateSpeedAndAccel() {
@@ -151,12 +156,12 @@ void calculateSpeedAndAccel() {
   Logger.print(millis());
 
   Logger.print(F(" RawAlt "));
-  Logger.print(barAlt,3);
+  Logger.print(barAlt, 3);
 
   Logger.print(F(" RawAcc "));
-  Logger.print(ax,3);
+  Logger.print(ax, 3);
   Logger.print(F(" Pitch "));
-  Logger.print(pitch,3);
+  Logger.print(pitch, 3);
 
   Logger.print(F(" gx "));
   Logger.print(gx);
@@ -170,28 +175,28 @@ void calculateSpeedAndAccel() {
   Logger.print(roll);
 
   Logger.print(F(" smoothedBarAlt "));
-  Logger.print(smoothedBarAlt,4);
+  Logger.print(smoothedBarAlt, 4);
 
   Logger.print(F(" pitotTrust "));
-  Logger.print(pitotTrust,2);
+  Logger.print(pitotTrust, 2);
   Logger.print(F(" pitotSpeed "));
-  Logger.print(pitotSpeed,4);
+  Logger.print(pitotSpeed, 4);
 
   Logger.print(F(" avgBarSpd "));
-  Logger.print(avgBarSpd,4);
+  Logger.print(avgBarSpd, 4);
   Logger.print(F(" gravitySpeed "));
-  Logger.print(gravitySpeed,4);
+  Logger.print(gravitySpeed, 4);
   Logger.print(F(" acc(ft/s) "));
-  Logger.print(upAcc,3);
+  Logger.print(upAcc, 3);
   Logger.print(F(" upSpeed "));
-  Logger.print(upSpeed,5);
+  Logger.print(upSpeed, 5);
   Logger.print(F(" kinGuess "));
-  Logger.print(kinematicsGuess,5);
+  Logger.print(kinematicsGuess, 5);
   Logger.print(F(" powGuess "));
-  Logger.print(powGuess,5);
+  Logger.print(powGuess, 5);
   Logger.print(F(" lnGuess "));
-  Logger.print(lnGuess,5);
-  
+  Logger.print(lnGuess, 5);
+
   Logger.println();
 
 }
@@ -269,18 +274,40 @@ void updatePitot() { //finds the speed from the pitot tube.
   double PR;
   double TR;
   double V;
-  double VV;
-  _status = fetch_pressure(&P_dat, &T_dat);
+
+  byte Press_H, Press_L;
+
+  Wire.requestFrom((int)address, (int) 4);//Request 4 bytes need 4 bytes are read
+#if (debugMode == true)
+  if (Wire.available() != 4) {
+    Serial.println("Error. ");
+    Serial.println(Wire.available());
+    Serial.println(" bytes given. Need 4");
+  }
+#endif
+
+  Press_H = Wire.read();
+  Press_L = Wire.read();
+  byte Temp_H = Wire.read();
+  byte  Temp_L = Wire.read();
+
+  _status = (Press_H >> 6) & 0x03;
+  Press_H = Press_H & 0x3f;
+  P_dat = (((unsigned int)Press_H) << 8) | Press_L;
+
+  Temp_L = (Temp_L >> 5);
+  T_dat = (((unsigned int)Temp_H) << 3) | Temp_L;
+
 
   switch (_status)
   {
     case 0: //Serial.println("Ok ");
       break;
-    case 1: Serial.println("Busy");
+    case 1: Logger.println("Busy");
       break;
-    case 2: Serial.println("Slate");
+    case 2: Logger.println("Slate");
       break;
-    default: Serial.println("Error");
+    default: Logger.println("Error");
       break;
   }
 
@@ -296,49 +323,21 @@ void updatePitot() { //finds the speed from the pitot tube.
   TR = (double)((T_dat * 0.09770395701));
   TR = TR - 50;
 
-/*
-  Serial.print("raw Pressure:");
-  Serial.println(P_dat);
-  Serial.println(P_dat, BIN);
-  Serial.print("pressure psi:");
-  Serial.println(PR, 10);
-  Serial.print("raw Temp:");
-  Serial.println(T_dat);
-  Serial.println(T_dat, BIN);
-  Serial.print("temp:");
-  Serial.println(TR);
+  /*
+    Serial.print("raw Pressure:");
+    Serial.println(P_dat);
+    Serial.println(P_dat, BIN);
+    Serial.print("pressure psi:");
+    Serial.println(PR, 10);
+    Serial.print("raw Temp:");
+    Serial.println(T_dat);
+    Serial.println(T_dat, BIN);
+    Serial.print("temp:");
+    Serial.println(TR);
 
-  Serial.print("speed m/s : ");
-  Serial.println(VV, 5);
-*/
-}
-
-byte fetch_pressure(unsigned int *p_P_dat, unsigned int *p_T_dat) {
-  byte address, Press_H, Press_L, _status;
-  unsigned int P_dat;
-  unsigned int T_dat;
-
-  address = 0x28;
-  //Wire.beginTransmission(address);
-  //Wire.endTransmission();
-  //delay(5);
-  Wire.requestFrom((int)address, (int) 4);//Request 4 bytes need 4 bytes are read
-  Press_H = Wire.read();
-  Press_L = Wire.read();
-  byte Temp_H = Wire.read();
-  byte  Temp_L = Wire.read();
-  Wire.endTransmission();
-
-
-  _status = (Press_H >> 6) & 0x03;
-  Press_H = Press_H & 0x3f;
-  P_dat = (((unsigned int)Press_H) << 8) | Press_L;
-  *p_P_dat = P_dat;
-
-  Temp_L = (Temp_L >> 5);
-  T_dat = (((unsigned int)Temp_H) << 3) | Temp_L;
-  *p_T_dat = T_dat;
-  return (_status);
+    Serial.print("speed m/s : ");
+    Serial.println(VV, 5);
+  */
 }
 
 void checkStage() {
@@ -361,11 +360,11 @@ void checkStage() {
         delay(2000);
         tickTime = tickTime + 2000;
         Logger.print(millis());
-        Logger.println(F(": Logging Values..."));
+        Logger.println(F(": Starting calibration..."));
       }
       break;
     case 1: //collecting values and averages on pad
-      if ((ax - 1 > 0.25f) || (millis() > 15000)) {
+      if (ax - 1 > 0.25f) {
         stage = 2; //we have taken off.
         Logger.println(F("We have launched."));
         Logger.println();
@@ -414,7 +413,6 @@ void checkStage() {
       }
       break;
 
-
     case 1: //collecting values and averages on pad
       if (Serial.available() > 0) { //if there is something available.
         stage = 2; //we have taken off.
@@ -437,9 +435,6 @@ void checkStage() {
 
 void loop() {
 
-  Logger.println(F("Succesful Boot"));
-
-  Logger.println(F("Place On Lanuch Pad....."));
   stage = 0; //waiting for the launch
   int runAltSpd = 0;
   tickTime = millis();
@@ -448,7 +443,7 @@ void loop() {
 
     if (millis() >= tickTime) { //tick is called 50 times a second. (20 ms)
       //long startTime = millis();
-      tickTime = tickTime + tickSpeedMS; //tickspeed is 20.
+      tickTime += tickSpeedMS; //tickspeed is 20.
       checkStage();
       updateGryoAndAccel();
 
@@ -461,13 +456,12 @@ void loop() {
         }
       } else {
         runAltSpd++;
-        //Serial.println("Not runing calculate speed and accel");
       }
       /*
-      if (millis() - startTime > tickSpeedMS) {
+        if (millis() - startTime > tickSpeedMS) {
         Serial.print("OVERTIME: ");
         Serial.println(millis() - startTime);
-      }
+        }
       */
     }
   }

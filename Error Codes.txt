@@ -1,0 +1,5 @@
+Errors for Rocket Code:
+
+001: We had to adjust for gravity this tick. The error was not more than five, so it was adjusted.
+002: We did not adjust for gravity this tick because the error between our old velocity minus gravity and the new SpeedBestGuess is more than 5 off.
+003: We have passed Apoapsis. Going down. Speed is negative.
