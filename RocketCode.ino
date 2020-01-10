@@ -28,8 +28,8 @@
 //Things to screw with:
 #define servoPin 9 //doesnt do anything rn
 #define address 0x28
-#define tickSpeedMS 20 //time between loops in miliseconds. (PROB DONT EDIT) (BUT YOU COULD  - no now you cant.) (we tested this. You can edit this. Currently, the tick takes 20 ms, so theoretically it could run 50 times a second. 
-#define tickSpeedS (tickSpeedMS / 1000.0f) // this tickspeed in terms of seconds.
+#define TICKSPEED_MS 20 //time between loops in miliseconds. (PROB DONT EDIT) (BUT YOU COULD  - no now you cant.) (we tested this. You can edit this. Currently, the tick takes 20 ms, so theoretically it could run 50 times a second. 
+#define TICKSPEED_S (TICKSPEED_MS / 1000.0f) // this tickspeed in terms of seconds.
 //UPDATE: the accelerometer run 50x a second (20ms). The alitude runs 20x a second (50ms). The speed calculatoin for the altitude runs 10x a second.
 
 #define targetAlt 800 //Target altitude of the launch.
@@ -40,8 +40,12 @@
 #define VtSq 7103.91f
 
 #define debugMode false//debug mode allows for all of the flight software to be running (aka, accelerometers no longer dictate orientation, also gryos stop being calibrated). You can tast flight stuff while still on the ground. Also, this sets communications to the serial monitor and not the logger.
-//#define debugRestTime 20000 //usuall set to 15000, the amount of time that the chip rests before deciding to be flying. This ends calibration.
-//^^^ DEPRECIATED: Now just waits for a serial line to become available.
+
+//Gyro Calibration Values.
+#define gxOFFSET 0
+#define gyOFFSET 0
+#define gzOFFSET 0
+
 
 Madgwick filter; //creates a quaternion.
 LPS ps; // PRESSURE SENSOR
@@ -62,8 +66,6 @@ float avgBarSpd;
 
 float ax, ay, az;
 float gx, gy, gz;
-float gxOFFSET, gyOFFSET, gzOFFSET;
-float gxt, gyt, gzt;
 float roll, pitch, yaw;
 unsigned int count;
 
@@ -81,7 +83,7 @@ void setup() {
   Logger.begin(115200);
   delay(10);
   Logger.println(F("Beginning.."));
-  filter.begin(50);
+  filter.begin(1000/TICKSPEED_MS);
   // Altimiter Stuff
   Wire.begin();
   while (!ps.init())
@@ -102,9 +104,15 @@ void setup() {
     while (1);
   }
   gyro.enableDefault();
-  delay(3000);
 
-
+  Serial.println(F("Calibration Offsets: "));
+  Serial.print(F("gxOFFSET:"));
+  Serial.println(gxOFFSET);
+  Serial.print(F("gyOFFSET:"));
+  Serial.println(gyOFFSET);
+  Serial.print(F("gxOFFSET:"));
+  Serial.println(gzOFFSET);
+  
   Logger.println(F("Succesful Boot"));
 
   Logger.println(F("Place On Lanuch Pad....."));
@@ -115,7 +123,7 @@ void calculateSpeedAndAccel() {
 
   if (abs(gravitySpeed - avgBarSpd) > 50) { //the difference between the speeds is unreasonable.
 #if (debugMode==false)
-    Logger.println("Error. gravSpd and avgBarSpd dont match. Adjusting Vars");
+    Logger.println(F("Error. gravSpd and avgBarSpd dont match. Adjusting Vars"));
 #endif
     gravitySpeed = gravitySpeed - ((gravitySpeed - avgBarSpd) / 2); //subtract difference between the two to get gravity speed closer to avgBarSpd.
   }
@@ -208,7 +216,7 @@ void updateAlt() { //finds the current altidute values. Also, if the smoothed sp
   smoothedBarAlt = (alt_alpha * barAlt + (1 - alt_alpha) * smoothedBarAlt); //finds the smoothed altitude. Should be regarded as most correct altitude.
 
 
-  float currentSmoothedSpd = (smoothedBarAlt - lastSmoothedBarAlt) / (tickSpeedS * 5); //multiplied by 5 because it is called only every 5th time.
+  float currentSmoothedSpd = (smoothedBarAlt - lastSmoothedBarAlt) / (TICKSPEED_S * 5); //multiplied by 5 because it is called only every 5th time.
   //float lastAvgBarSpd = avgBarSpd;
   avgBarSpd = (speed_alpha * currentSmoothedSpd + (1 - speed_alpha) * avgBarSpd); //smooths the speed.
 }
@@ -227,18 +235,6 @@ void updateGryoAndAccel() { //finds the pitch
   gy = (gyro.g.y * (8.75 / 1000));
   gz = (gyro.g.z * (8.75 / 1000));
 
-  // the g_t is the total build up.
-  if ((stage == 1) && ((gx - gxOFFSET + gy - gyOFFSET + gz - gzOFFSET) < 5)) {
-
-    gxt = gxt + gx;
-    gyt = gyt + gy;
-    gzt = gzt + gz;
-    count++;
-
-    gxOFFSET = gxt / count;
-    gyOFFSET = gyt / count;
-    gzOFFSET = gzt / count;
-  }
   gx = gx - gxOFFSET;
   gy = gy - gyOFFSET;
   gz = gz - gzOFFSET;
@@ -262,7 +258,7 @@ void updateGryoAndAccel() { //finds the pitch
     }
   } else { //we are in the air. This time the acceleration is the hypotenuse, and we need to find the upward component. We do this by multiplying by the cos.
     upAcc = gravity * ((ax / cos(DEG_TO_RAD * pitch)) - 1.0f);
-    gravitySpeed  = (upAcc * tickSpeedS) + gravitySpeed; //this is called every tick, so we need to multiply the acceleration (feet per secod) by (seconds per tick) to get feet in the last tick. Then add that to the total buildup.
+    gravitySpeed  = (upAcc * TICKSPEED_S) + gravitySpeed; //this is called every tick, so we need to multiply the acceleration (feet per secod) by (seconds per tick) to get feet in the last tick. Then add that to the total buildup.
   }
 
 }
@@ -301,7 +297,7 @@ void updatePitot() { //finds the speed from the pitot tube.
 
   switch (_status)
   {
-    case 0: //Serial.println("Ok ");
+    case 0:
       break;
     case 1: Logger.println("Busy");
       break;
@@ -322,22 +318,6 @@ void updatePitot() { //finds the speed from the pitot tube.
 
   TR = (double)((T_dat * 0.09770395701));
   TR = TR - 50;
-
-  /*
-    Serial.print("raw Pressure:");
-    Serial.println(P_dat);
-    Serial.println(P_dat, BIN);
-    Serial.print("pressure psi:");
-    Serial.println(PR, 10);
-    Serial.print("raw Temp:");
-    Serial.println(T_dat);
-    Serial.println(T_dat, BIN);
-    Serial.print("temp:");
-    Serial.println(TR);
-
-    Serial.print("speed m/s : ");
-    Serial.println(VV, 5);
-  */
 }
 
 void checkStage() {
@@ -360,7 +340,6 @@ void checkStage() {
         delay(2000);
         tickTime = tickTime + 2000;
         Logger.print(millis());
-        Logger.println(F(": Starting calibration..."));
       }
       break;
     case 1: //collecting values and averages on pad
@@ -368,12 +347,6 @@ void checkStage() {
         stage = 2; //we have taken off.
         Logger.println(F("We have launched."));
         Logger.println();
-        Logger.print("gx offset ");
-        Logger.print(gxOFFSET);
-        Logger.print(" gyOFFSET ");
-        Logger.print(gyOFFSET);
-        Logger.print(" gzOFFSET: ");
-        Logger.println(gzOFFSET);
       }
       break;
     case 2: //accelerating
@@ -400,8 +373,6 @@ void checkStage() {
 */
   switch (stage) {
     case 0: //being put on the pad
-      //Serial.println(pitch);
-      //Serial.println(ax);
       if ((pitch < 20) and (ax > 0.9) and (ax < 1.1) ) {
         Logger.print(millis());
         Logger.println(F(": Pad Detected!"));
@@ -443,7 +414,7 @@ void loop() {
 
     if (millis() >= tickTime) { //tick is called 50 times a second. (20 ms)
       //long startTime = millis();
-      tickTime += tickSpeedMS; //tickspeed is 20.
+      tickTime += TICKSPEED_MS; //tickspeed is 20.
       checkStage();
       updateGryoAndAccel();
       if (runAltSpd == 4) { //only runs if it is every 5th time. (takes 22 (24 now with the pitot) ms, which means it goes over the limit)
