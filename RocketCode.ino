@@ -446,7 +446,6 @@ void loop() {
       tickTime += tickSpeedMS; //tickspeed is 20.
       checkStage();
       updateGryoAndAccel();
-
       if (runAltSpd == 4) { //only runs if it is every 5th time. (takes 22 (24 now with the pitot) ms, which means it goes over the limit)
         updateAlt();
         updatePitot();
