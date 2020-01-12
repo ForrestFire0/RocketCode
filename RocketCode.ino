@@ -40,19 +40,19 @@
 #define VtSq 7103.91f
 
 #define debugMode false//debug mode allows for all of the flight software to be running (aka, accelerometers no longer dictate orientation, also gryos stop being calibrated). You can tast flight stuff while still on the ground. Also, this sets communications to the serial monitor and not the logger.
+#define printToScreen false //print to screen changes logger the screen if not in debug mode.
 
 //Gyro Calibration Values.
-#define gxOFFSET 0
-#define gyOFFSET 0
-#define gzOFFSET 0
-
+#define gxOFFSET -0.13429
+#define gyOFFSET 1.12185
+#define gzOFFSET 2.17824
 
 Madgwick filter; //creates a quaternion.
 LPS ps; // PRESSURE SENSOR
 LSM303 lsm; //accelerometer
 L3G gyro; //gyro
 
-#if (debugMode == true)
+#if (debugMode == true or printToScreen == true)
 #define Logger Serial
 #else
 SoftwareSerial Logger(2, 3); //Logger
@@ -82,8 +82,8 @@ void setup() {
 
   Logger.begin(115200);
   delay(10);
-  Logger.println(F("Beginning.."));
-  filter.begin(1000/TICKSPEED_MS);
+  Logger.println(F("Starting Startup.."));
+  filter.begin(1000 / TICKSPEED_MS);
   // Altimiter Stuff
   Wire.begin();
   while (!ps.init())
@@ -93,7 +93,9 @@ void setup() {
   }
 
   ps.enableDefault();
-
+#if(debugMode==true)
+  Serial.println("Warning, Debug Mode on");
+#endif
   //Accelerometer Stuff
   lsm.init();
   lsm.enableDefault(); //AHHAHAHAHAHA ITS NOT ACTUALLY DEFAULT I SET IT TO 16G's
@@ -105,21 +107,21 @@ void setup() {
   }
   gyro.enableDefault();
 
-  Serial.println(F("Calibration Offsets: "));
-  Serial.print(F("gxOFFSET:"));
-  Serial.println(gxOFFSET);
-  Serial.print(F("gyOFFSET:"));
-  Serial.println(gyOFFSET);
-  Serial.print(F("gxOFFSET:"));
-  Serial.println(gzOFFSET);
-  
+  Logger.println(F("Calibration Offsets: "));
+  Logger.print(F("gxOFFSET:"));
+  Logger.println(gxOFFSET);
+  Logger.print(F("gyOFFSET:"));
+  Logger.println(gyOFFSET);
+  Logger.print(F("gxOFFSET:"));
+  Logger.println(gzOFFSET);
+
   Logger.println(F("Succesful Boot"));
 
   Logger.println(F("Place On Lanuch Pad....."));
 }
 
 void calculateSpeedAndAccel() {
-  int pitotTrust;
+  float pitotTrust;
 
   if (abs(gravitySpeed - avgBarSpd) > 50) { //the difference between the speeds is unreasonable.
 #if (debugMode==false)
@@ -127,6 +129,7 @@ void calculateSpeedAndAccel() {
 #endif
     gravitySpeed = gravitySpeed - ((gravitySpeed - avgBarSpd) / 2); //subtract difference between the two to get gravity speed closer to avgBarSpd.
   }
+
   if ((stage > 1) && (pitotSpeed > 10))  { //aka flying in the air
     pitotTrust = min(0.95, upSpeed / 50); // a scale on how much we trust the pitot tube.
   }
@@ -142,7 +145,7 @@ void calculateSpeedAndAccel() {
 
   float powGuess = smoothedBarAlt + (0.023f * pow(abs(upSpeed), 1.89f)); //uses the best guess of the speed to find how many more feet we have to go. (the google sheets way)
 
-  double lnGuess = smoothedBarAlt + ((VtSq / (2 * gravity)) * log((sq(upSpeed) + VtSq) / VtSq)); //uses the official method of determining max hieght. (the nasa way)
+  float lnGuess = smoothedBarAlt + ((VtSq / (2 * gravity)) * log((sq(upSpeed) + VtSq) / VtSq)); //uses the official method of determining max hieght. (the nasa way)
 
 
   //This whole section  \/ \/ \/ \/ \/ \/ needs to be completly redone. But it doesnt really matter yet...
@@ -160,6 +163,7 @@ void calculateSpeedAndAccel() {
     //setAB(min(max(sensitivity * errorMultiplier * spdMultiplier, 0), 1));
     }
   */
+
   Logger.print(F("Time "));
   Logger.print(millis());
 
@@ -214,7 +218,6 @@ void updateAlt() { //finds the current altidute values. Also, if the smoothed sp
   barAlt = ps.pressureToAltitudeFeet(ps.readPressureInchesHg()); //finds the altitude.
   float lastSmoothedBarAlt = smoothedBarAlt;
   smoothedBarAlt = (alt_alpha * barAlt + (1 - alt_alpha) * smoothedBarAlt); //finds the smoothed altitude. Should be regarded as most correct altitude.
-
 
   float currentSmoothedSpd = (smoothedBarAlt - lastSmoothedBarAlt) / (TICKSPEED_S * 5); //multiplied by 5 because it is called only every 5th time.
   //float lastAvgBarSpd = avgBarSpd;
@@ -332,7 +335,9 @@ void checkStage() {
 #if (debugMode==false) //regular operation:
   switch (stage) {
     case 0: //being put on the pad
-
+      Logger.println("Pitch: ");
+      Logger.println(pitch);
+      
       if ((pitch < 20) and (ax > 0.9) and (ax < 1.1) ) {
         Logger.print(millis());
         Logger.println(F(": Pad Detected!"));

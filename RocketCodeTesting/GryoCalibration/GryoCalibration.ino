@@ -1,6 +1,6 @@
 #include <Wire.h>
 #include <L3G.h>
-#define TIMEOUT_MILLIS 5000
+#define TIMEOUT_MILLIS 2000
 #define TIMEOUT_SECONDS TIMEOUT_MILLIS/1000
 L3G gyro;
 
@@ -41,9 +41,9 @@ void loop() {
 
   float gxMAX, gyMAX, gzMAX;
   float gxMIN, gyMIN, gzMIN;
-  int tenth = TIMEOUT_MILLIS / 10;
+  const int tenth = TIMEOUT_MILLIS / 10;
   long counter;
-  int startOfLastTenth = millis();
+  long startOfLastTenth = millis();
   while (millis() < TIMEOUT_MILLIS + startMillis and Serial.available() == 0) {
 
     gyro.read();
@@ -75,16 +75,16 @@ void loop() {
       startOfLastTenth = millis();
       Serial.print("-");
     }
-    delay(20);
+    delay(5);
   }
   Serial.println();
   Serial.println("Gyro Calibration Complete.");
   Serial.print("#define gxOFFSET ");
-  Serial.println(gxt / count);
-  Serial.print("#define gxOFFSET ");
-  Serial.println(gyt / count);
-  Serial.print("#define gxOFFSET ");
-  Serial.println(gzt / count);
+  Serial.println(gxt / count, 5);
+  Serial.print("#define gyOFFSET ");
+  Serial.println(gyt / count, 5);
+  Serial.print("#define gzOFFSET ");
+  Serial.println(gzt / count, 5);
   Serial.println("\n\n\n");
 
   Serial.println("GX Avg: ");

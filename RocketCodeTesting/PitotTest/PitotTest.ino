@@ -32,16 +32,7 @@ void loop()
     switch (_status)
     {
       case 0:
-        break;
-      case 1: Serial.println("Busy");
-        break;
-      case 2: Serial.println("Slate");
-        break;
-      default: Serial.println("Error");
-        break;
-    }
-
-    PR = (double)((P_dat-8130.8)/(14744.7)) ;
+      PR = (double)((P_dat-8130.8)/(14744.7)) ;
     Serial.println(PR,10);
     total = total + P_dat;
     count++;
@@ -65,6 +56,14 @@ void loop()
    Serial.println(T_dat);
    Serial.print("speed m/s : ");
    Serial.println(VV,5);
+        break;
+      case 1: Serial.println("Busy");
+        break;
+      case 2: Serial.println("Slate");
+        break;
+      default: Serial.println("Error");
+        break;
+    }
 
     delay(100);
   }
