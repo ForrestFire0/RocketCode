@@ -27,6 +27,7 @@
 
 //Things to screw with:
 #define servoPin 9 //doesnt do anything rn
+#define ledStatusPin 10
 #define address 0x28
 #define TICKSPEED_MS 20 //time between loops in miliseconds. (PROB DONT EDIT) (BUT YOU COULD  - no now you cant.) (we tested this. You can edit this. Currently, the tick takes 20 ms, so theoretically it could run 50 times a second. 
 #define TICKSPEED_S (TICKSPEED_MS / 1000.0f) // this tickspeed in terms of seconds.
@@ -79,6 +80,8 @@ double pitotSpeed;
 byte stage = 0;
 
 void setup() {
+  pinMode(ledStatusPin, OUTPUT);    // sets the digital pin as output
+  digitalWrite(ledStatusPin, HIGH);
 
   Logger.begin(115200);
   delay(10);
@@ -337,7 +340,7 @@ void checkStage() {
     case 0: //being put on the pad
       Logger.println("Pitch: ");
       Logger.println(pitch);
-      
+
       if ((pitch < 20) and (ax > 0.9) and (ax < 1.1) ) {
         Logger.print(millis());
         Logger.println(F(": Pad Detected!"));
@@ -426,9 +429,8 @@ void loop() {
         updateAlt();
         updatePitot();
         runAltSpd = 0;
-        if (stage > 0) {
-          calculateSpeedAndAccel(); //this is when it calculates and prints things. (10x a second)
-        }
+        statusLED();
+        if (stage > 0) calculateSpeedAndAccel(); //this is when it calculates and prints things. (10x a second)
       } else {
         runAltSpd++;
       }
@@ -441,3 +443,61 @@ void loop() {
     }
   }
 }
+
+
+/*
+   Sets the status LED based on the stage
+   When turned on: Solid on.
+   0 = being put on pad -- pulse every second.
+   1 = waiting -- Toggle 10x a second.
+   2 = accelerating -- On launch: Solid on.
+   All others: Off
+*/
+
+byte every10 = 0;
+bool isOn;
+void statusLED() {
+  switch (stage) {
+    case 0:
+      if(every10 == 10) {
+        digitalWrite(ledStatusPin, HIGH);
+        every10 = 1;
+      } else every10++;
+      return;
+    case 1:
+      digitalWrite(ledStatusPin, !isOn);
+      isOn = !isOn;
+      return;
+    case 2:
+      if (!isOn) digitalWrite(ledStatusPin, HIGH);
+      return;
+    default:
+      digitalWrite(ledStatusPin, LOW);
+      return;
+  }
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+//to hold down some lines.
