@@ -44,9 +44,9 @@
 #define printToScreen false //print to screen changes logger the screen if not in debug mode.
 
 //Gyro Calibration Values.
-#define gxOFFSET -0.13429
-#define gyOFFSET 1.12185
-#define gzOFFSET 2.17824
+#define gxOFFSET -0.14586
+#define gyOFFSET 0.94122
+#define gzOFFSET 2.36804
 
 Madgwick filter; //creates a quaternion.
 LPS ps; // PRESSURE SENSOR
@@ -282,8 +282,8 @@ void updatePitot() { //finds the speed from the pitot tube.
   Wire.requestFrom((int)address, (int) 4);//Request 4 bytes need 4 bytes are read
 #if (debugMode == true)
   if (Wire.available() != 4) {
-    Serial.println("Error. ");
-    Serial.println(Wire.available());
+    Serial.print("Error. ");
+    Serial.print(Wire.available());
     Serial.println(" bytes given. Need 4");
   }
 #endif
@@ -338,7 +338,7 @@ void checkStage() {
 #if (debugMode==false) //regular operation:
   switch (stage) {
     case 0: //being put on the pad
-      Logger.println("Pitch: ");
+      Logger.print("Pitch: ");
       Logger.println(pitch);
 
       if ((pitch < 20) and (ax > 0.9) and (ax < 1.1) ) {
@@ -381,6 +381,8 @@ void checkStage() {
 */
   switch (stage) {
     case 0: //being put on the pad
+      Logger.print("Pitch: ");
+      Logger.println(pitch);
       if ((pitch < 20) and (ax > 0.9) and (ax < 1.1) ) {
         Logger.print(millis());
         Logger.println(F(": Pad Detected!"));
@@ -395,14 +397,7 @@ void checkStage() {
     case 1: //collecting values and averages on pad
       if (Serial.available() > 0) { //if there is something available.
         stage = 2; //we have taken off.
-        Logger.println(F("Calibration Complete."));
-        Logger.println();
-        Logger.print("gx offset ");
-        Logger.print(gxOFFSET);
-        Logger.print(" gyOFFSET ");
-        Logger.print(gyOFFSET);
-        Logger.print(" gzOFFSET: ");
-        Logger.println(gzOFFSET);
+        Logger.println(F("Takeoff Triggered."));
       }
       break;
 
@@ -434,12 +429,12 @@ void loop() {
       } else {
         runAltSpd++;
       }
-      /*
-        if (millis() - startTime > tickSpeedMS) {
+#if(debugMode)
+      if (millis() - startTime > tickSpeedMS) {
         Serial.print("OVERTIME: ");
         Serial.println(millis() - startTime);
-        }
-      */
+      }
+#endif
     }
   }
 }
@@ -459,7 +454,7 @@ bool isOn;
 void statusLED() {
   switch (stage) {
     case 0:
-      if(every10 == 10) {
+      if (every10 == 10) {
         digitalWrite(ledStatusPin, HIGH);
         every10 = 1;
       } else every10++;

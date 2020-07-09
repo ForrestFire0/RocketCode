@@ -1,3 +1,5 @@
+#include <SparkFun_Ublox_Arduino_Library.h>
+
 /*
   The sensor outputs provided by the library are the raw 16-bit values
   obtained by concatenating the 8-bit high and low accelerometer and

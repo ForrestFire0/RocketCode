@@ -63,13 +63,6 @@ void loop() {
       Serial.print(" Z: ");
       Serial.print(gz);
     */
-    gxMAX = max(gxMAX, gx);
-    gyMAX = max(gyMAX, gy);
-    gzMAX = max(gzMAX, gz);
-
-    gxMIN = min(gxMIN, gx);
-    gyMIN = min(gyMIN, gy);
-    gzMIN = min(gzMIN, gz);
 
     if (millis() - startOfLastTenth > tenth) {
       startOfLastTenth = millis();
@@ -86,13 +79,6 @@ void loop() {
   Serial.print("#define gzOFFSET ");
   Serial.println(gzt / count, 5);
   Serial.println("\n\n\n");
-
-  Serial.println("GX Avg: ");
-  Serial.print(gxt / count);
-  Serial.print(" Max: ");
-  Serial.print(gxMAX);
-  Serial.print(" Min: ");
-  Serial.println(gxMIN);
 
 
   delay(1000);
